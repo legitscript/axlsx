@@ -83,20 +83,48 @@ class TestCell < Test::Unit::TestCase
     assert_equal(Axlsx.col_ref(0), "A")
   end
 
-  def test_cell_type_from_value
+  def test_cell_type_from_value_with_detection
+    cur_disable_detect_types_from_string = Axlsx::disable_detect_types_from_string
+
+    Axlsx::disable_detect_types_from_string = false
     assert_equal(@c.send(:cell_type_from_value, 1.0), :float)
+    assert_equal(@c.send(:cell_type_from_value, "2.0"), :float)
+    assert_equal(@c.send(:cell_type_from_value, 1.0/10**6), :float)
     assert_equal(@c.send(:cell_type_from_value, 1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "2"), :integer)
+    assert_equal(@c.send(:cell_type_from_value, -1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "-2"), :integer)
     assert_equal(@c.send(:cell_type_from_value, Date.today), :date)
     assert_equal(@c.send(:cell_type_from_value, Time.now), :time)
     assert_equal(@c.send(:cell_type_from_value, []), :string)
     assert_equal(@c.send(:cell_type_from_value, "d"), :string)
     assert_equal(@c.send(:cell_type_from_value, nil), :string)
-    assert_equal(@c.send(:cell_type_from_value, -1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "=SUM(A1:A2)"), :formula)
+    assert_equal(@c.send(:cell_type_from_value, "{=SUM(A1:A2*B1:B2)}"), :formula)
     assert_equal(@c.send(:cell_type_from_value, true), :boolean)
     assert_equal(@c.send(:cell_type_from_value, false), :boolean)
-    assert_equal(@c.send(:cell_type_from_value, 1.0/10**6), :float)
     assert_equal(@c.send(:cell_type_from_value, Axlsx::RichText.new), :richtext)
-    assert_equal(:iso_8601, @c.send(:cell_type_from_value, '2008-08-30T01:45:36.123+09:00'))
+    assert_equal(@c.send(:cell_type_from_value, "2008-08-30T01:45:36.123+09:00"), :iso_8601)
+  ensure
+    Axlsx::disable_detect_types_from_string = cur_disable_detect_types_from_string
+  end
+
+  def test_cell_type_from_value_without_detection
+    cur_disable_detect_types_from_string = Axlsx::disable_detect_types_from_string
+
+    Axlsx::disable_detect_types_from_string = true
+    assert_equal(@c.send(:cell_type_from_value, 1.0), :float)
+    assert_equal(@c.send(:cell_type_from_value, "2.0"), :string)
+    assert_equal(@c.send(:cell_type_from_value, 1.0/10**6), :float)
+    assert_equal(@c.send(:cell_type_from_value, 1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "2"), :string)
+    assert_equal(@c.send(:cell_type_from_value, -1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "-2"), :string)
+    assert_equal(@c.send(:cell_type_from_value, "=SUM(A1:A2)"), :string)
+    assert_equal(@c.send(:cell_type_from_value, "{=SUM(A1:A2*B1:B2)}"), :string)
+    assert_equal(@c.send(:cell_type_from_value, "2008-08-30T01:45:36.123+09:00"), :string)
+  ensure
+    Axlsx::disable_detect_types_from_string = cur_disable_detect_types_from_string
   end
 
   def test_cast_value

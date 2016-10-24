@@ -426,14 +426,20 @@ module Axlsx
         :time
       elsif v.is_a?(TrueClass) || v.is_a?(FalseClass)
         :boolean
-      elsif v.to_s =~ Axlsx::NUMERIC_REGEX
+      elsif v.is_a?(Integer)
         :integer
-      elsif v.to_s =~ Axlsx::FLOAT_REGEX
+      elsif v.is_a?(Float)
         :float
-      elsif v.to_s =~ Axlsx::ISO_8601_REGEX
-        :iso_8601
-      elsif v.is_a? RichText
+      elsif v.is_a?(RichText)
         :richtext
+      elsif !Axlsx::disable_detect_types_from_string && v.to_s =~ Axlsx::NUMERIC_REGEX
+        :integer
+      elsif !Axlsx::disable_detect_types_from_string && v.to_s =~ Axlsx::FLOAT_REGEX
+        :float
+      elsif !Axlsx::disable_detect_types_from_string && v.to_s =~ Axlsx::ISO_8601_REGEX
+        :iso_8601
+      elsif !Axlsx::disable_detect_types_from_string && v.to_s =~ Axlsx::FORMULA_REGEX
+        :formula
       else
         :string
       end

@@ -165,4 +165,14 @@ module Axlsx
   def self.trust_input=(trust_me)
     @trust_input = trust_me
   end
+
+  # Instructs the serializer not to detect numeric and date types contained in strings
+  def self.disable_detect_types_from_string
+    @disable_detect_types_from_string ||= false
+  end
+
+  # @param[Boolean] disable_detect_types_from_string A boolean value indicating if string cell values should not be inspected for non-string types
+  def self.disable_detect_types_from_string=(disable_detect_types_from_string)
+    @disable_detect_types_from_string = disable_detect_types_from_string
+  end
 end
