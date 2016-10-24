@@ -192,7 +192,7 @@ class TestCell < Test::Unit::TestCase
     assert_nothing_raised { @c.u = :single }
     assert_equal(@c.u, :single)
     doc = Nokogiri::XML(@c.to_xml_string(1,1))
-    assert(doc.xpath('//u[@val="single"]'))
+    refute_empty(doc.xpath('//u[@val="single"]'))
   end
 
   def test_i
@@ -260,13 +260,13 @@ class TestCell < Test::Unit::TestCase
     @c.value = 'plain string'
     assert_equal(@c.plain_string?, true)
 
+    @c.value = '=sum'
+    assert_equal(@c.plain_string?, true)
+
     @c.value = nil
     assert_equal(@c.plain_string?, false)
 
     @c.value = ''
-    assert_equal(@c.plain_string?, false)
-
-    @c.value = '=sum'
     assert_equal(@c.plain_string?, false)
 
     @c.value = 'plain string'
@@ -294,29 +294,31 @@ class TestCell < Test::Unit::TestCase
     @c.font_name = 'arial'
     @c.color = 'FF0000'
     c_xml = Nokogiri::XML(@c.to_xml_string(1,1))
-    assert(c_xml.xpath("//b"))
+    refute_empty(c_xml.xpath("//b"))
   end
 
   def test_to_xml_string_formula
     p = Axlsx::Package.new
     ws = p.workbook.add_worksheet do |sheet|
-      sheet.add_row ["=IF(2+2=4,4,5)"]
+      sheet.add_row ["=Just a string=", "=IF(2+2=4,4,5)"], types: [:string, :formula]
     end
     doc = Nokogiri::XML(ws.to_xml_string)
-    assert(doc.xpath("//f[@text()='IF(2+2=4,4,5)']"))
-
+    doc.remove_namespaces!
+    refute_empty(doc.xpath("//t[text()='=Just a string=']"))
+    refute_empty(doc.xpath("//f[text()='IF(2+2=4,4,5)']"))
   end
 
   def test_to_xml_string_array_formula
     p = Axlsx::Package.new
     ws = p.workbook.add_worksheet do |sheet|
-      sheet.add_row ["{=SUM(C2:C11*D2:D11)}"]
+      sheet.add_row ["{=Just a string=}", "{=SUM(C2:C11*D2:D11)}"], types: [:string, :formula]
     end
     doc = Nokogiri::XML(ws.to_xml_string)
     doc.remove_namespaces!
-    assert(doc.xpath("//f[text()='SUM(C2:C11*D2:D11)']"))
-    assert(doc.xpath("//f[@t='array']"))
-    assert(doc.xpath("//f[@ref='A1']"))
+    refute_empty(doc.xpath("//t[text()='{=Just a string=}']"))
+    refute_empty(doc.xpath("//f[text()='SUM(C2:C11*D2:D11)']"))
+    refute_empty(doc.xpath("//f[@t='array']"))
+    refute_empty(doc.xpath("//f[@ref='B1']"))
   end
 
   def test_font_size_with_custom_style_and_no_sz
@@ -353,6 +355,6 @@ class TestCell < Test::Unit::TestCase
       errors.push error
       puts error.message
     end
-    assert(errors.empty?, "error free validation")
+    assert_empty(errors, "error free validation")
   end
 end
