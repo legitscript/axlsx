@@ -66,7 +66,7 @@ module Axlsx
                      :vertAlign, :sz, :color, :scheme].freeze
 
     CELL_TYPES = [:date, :time, :float, :integer, :richtext,
-                  :string, :boolean, :iso_8601].freeze
+                  :string, :boolean, :iso_8601, :formula].freeze
 
     # The index of the cellXfs item to be applied to this cell.
     # @return [Integer]
@@ -126,8 +126,7 @@ module Axlsx
       type == :string &&         # String typed
         !is_text_run? &&          # No inline styles
         !@value.nil? &&           # Not nil
-        !@value.empty? &&         # Not empty
-        !@value.start_with?(?=)  # Not a formula
+        !@value.empty?            # Not empty
     end
 
     # The inline font_name property for the cell
@@ -323,11 +322,11 @@ module Axlsx
     end
 
     def is_formula?
-      type == :string && @value.to_s.start_with?(?=)
+      type == :formula
     end
 
     def is_array_formula?
-      type == :string && @value.to_s.start_with?('{=') && @value.to_s.end_with?('}')
+      type == :formula && @value.to_s.start_with?('{=') && @value.to_s.end_with?('}')
     end
 
     # returns the absolute or relative string style reference for
@@ -427,14 +426,20 @@ module Axlsx
         :time
       elsif v.is_a?(TrueClass) || v.is_a?(FalseClass)
         :boolean
-      elsif v.to_s =~ Axlsx::NUMERIC_REGEX
+      elsif v.is_a?(Integer)
         :integer
-      elsif v.to_s =~ Axlsx::FLOAT_REGEX
+      elsif v.is_a?(Float)
         :float
-      elsif v.to_s =~ Axlsx::ISO_8601_REGEX
-        :iso_8601
-      elsif v.is_a? RichText
+      elsif v.is_a?(RichText)
         :richtext
+      elsif !Axlsx::disable_detect_types_from_string && v.to_s =~ Axlsx::NUMERIC_REGEX
+        :integer
+      elsif !Axlsx::disable_detect_types_from_string && v.to_s =~ Axlsx::FLOAT_REGEX
+        :float
+      elsif !Axlsx::disable_detect_types_from_string && v.to_s =~ Axlsx::ISO_8601_REGEX
+        :iso_8601
+      elsif !Axlsx::disable_detect_types_from_string && v.to_s =~ Axlsx::FORMULA_REGEX
+        :formula
       else
         :string
       end

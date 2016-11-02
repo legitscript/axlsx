@@ -83,20 +83,48 @@ class TestCell < Test::Unit::TestCase
     assert_equal(Axlsx.col_ref(0), "A")
   end
 
-  def test_cell_type_from_value
+  def test_cell_type_from_value_with_detection
+    cur_disable_detect_types_from_string = Axlsx::disable_detect_types_from_string
+
+    Axlsx::disable_detect_types_from_string = false
     assert_equal(@c.send(:cell_type_from_value, 1.0), :float)
+    assert_equal(@c.send(:cell_type_from_value, "2.0"), :float)
+    assert_equal(@c.send(:cell_type_from_value, 1.0/10**6), :float)
     assert_equal(@c.send(:cell_type_from_value, 1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "2"), :integer)
+    assert_equal(@c.send(:cell_type_from_value, -1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "-2"), :integer)
     assert_equal(@c.send(:cell_type_from_value, Date.today), :date)
     assert_equal(@c.send(:cell_type_from_value, Time.now), :time)
     assert_equal(@c.send(:cell_type_from_value, []), :string)
     assert_equal(@c.send(:cell_type_from_value, "d"), :string)
     assert_equal(@c.send(:cell_type_from_value, nil), :string)
-    assert_equal(@c.send(:cell_type_from_value, -1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "=SUM(A1:A2)"), :formula)
+    assert_equal(@c.send(:cell_type_from_value, "{=SUM(A1:A2*B1:B2)}"), :formula)
     assert_equal(@c.send(:cell_type_from_value, true), :boolean)
     assert_equal(@c.send(:cell_type_from_value, false), :boolean)
-    assert_equal(@c.send(:cell_type_from_value, 1.0/10**6), :float)
     assert_equal(@c.send(:cell_type_from_value, Axlsx::RichText.new), :richtext)
-    assert_equal(:iso_8601, @c.send(:cell_type_from_value, '2008-08-30T01:45:36.123+09:00'))
+    assert_equal(@c.send(:cell_type_from_value, "2008-08-30T01:45:36.123+09:00"), :iso_8601)
+  ensure
+    Axlsx::disable_detect_types_from_string = cur_disable_detect_types_from_string
+  end
+
+  def test_cell_type_from_value_without_detection
+    cur_disable_detect_types_from_string = Axlsx::disable_detect_types_from_string
+
+    Axlsx::disable_detect_types_from_string = true
+    assert_equal(@c.send(:cell_type_from_value, 1.0), :float)
+    assert_equal(@c.send(:cell_type_from_value, "2.0"), :string)
+    assert_equal(@c.send(:cell_type_from_value, 1.0/10**6), :float)
+    assert_equal(@c.send(:cell_type_from_value, 1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "2"), :string)
+    assert_equal(@c.send(:cell_type_from_value, -1), :integer)
+    assert_equal(@c.send(:cell_type_from_value, "-2"), :string)
+    assert_equal(@c.send(:cell_type_from_value, "=SUM(A1:A2)"), :string)
+    assert_equal(@c.send(:cell_type_from_value, "{=SUM(A1:A2*B1:B2)}"), :string)
+    assert_equal(@c.send(:cell_type_from_value, "2008-08-30T01:45:36.123+09:00"), :string)
+  ensure
+    Axlsx::disable_detect_types_from_string = cur_disable_detect_types_from_string
   end
 
   def test_cast_value
@@ -192,7 +220,7 @@ class TestCell < Test::Unit::TestCase
     assert_nothing_raised { @c.u = :single }
     assert_equal(@c.u, :single)
     doc = Nokogiri::XML(@c.to_xml_string(1,1))
-    assert(doc.xpath('//u[@val="single"]'))
+    refute_empty(doc.xpath('//u[@val="single"]'))
   end
 
   def test_i
@@ -260,13 +288,13 @@ class TestCell < Test::Unit::TestCase
     @c.value = 'plain string'
     assert_equal(@c.plain_string?, true)
 
+    @c.value = '=sum'
+    assert_equal(@c.plain_string?, true)
+
     @c.value = nil
     assert_equal(@c.plain_string?, false)
 
     @c.value = ''
-    assert_equal(@c.plain_string?, false)
-
-    @c.value = '=sum'
     assert_equal(@c.plain_string?, false)
 
     @c.value = 'plain string'
@@ -294,29 +322,31 @@ class TestCell < Test::Unit::TestCase
     @c.font_name = 'arial'
     @c.color = 'FF0000'
     c_xml = Nokogiri::XML(@c.to_xml_string(1,1))
-    assert(c_xml.xpath("//b"))
+    refute_empty(c_xml.xpath("//b"))
   end
 
   def test_to_xml_string_formula
     p = Axlsx::Package.new
     ws = p.workbook.add_worksheet do |sheet|
-      sheet.add_row ["=IF(2+2=4,4,5)"]
+      sheet.add_row ["=Just a string=", "=IF(2+2=4,4,5)"], types: [:string, :formula]
     end
     doc = Nokogiri::XML(ws.to_xml_string)
-    assert(doc.xpath("//f[@text()='IF(2+2=4,4,5)']"))
-
+    doc.remove_namespaces!
+    refute_empty(doc.xpath("//t[text()='=Just a string=']"))
+    refute_empty(doc.xpath("//f[text()='IF(2+2=4,4,5)']"))
   end
 
   def test_to_xml_string_array_formula
     p = Axlsx::Package.new
     ws = p.workbook.add_worksheet do |sheet|
-      sheet.add_row ["{=SUM(C2:C11*D2:D11)}"]
+      sheet.add_row ["{=Just a string=}", "{=SUM(C2:C11*D2:D11)}"], types: [:string, :formula]
     end
     doc = Nokogiri::XML(ws.to_xml_string)
     doc.remove_namespaces!
-    assert(doc.xpath("//f[text()='SUM(C2:C11*D2:D11)']"))
-    assert(doc.xpath("//f[@t='array']"))
-    assert(doc.xpath("//f[@ref='A1']"))
+    refute_empty(doc.xpath("//t[text()='{=Just a string=}']"))
+    refute_empty(doc.xpath("//f[text()='SUM(C2:C11*D2:D11)']"))
+    refute_empty(doc.xpath("//f[@t='array']"))
+    refute_empty(doc.xpath("//f[@ref='B1']"))
   end
 
   def test_font_size_with_custom_style_and_no_sz
@@ -353,6 +383,6 @@ class TestCell < Test::Unit::TestCase
       errors.push error
       puts error.message
     end
-    assert(errors.empty?, "error free validation")
+    assert_empty(errors, "error free validation")
   end
 end
